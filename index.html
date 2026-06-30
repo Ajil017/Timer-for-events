@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EXODUS HACK-JAM 2026</title>
+    <style>
+        /* --- FONTS --- */
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Rye&family=Space+Mono:wght@400;700&display=swap');
+
+        /* --- VARIABLES --- */
+        :root {
+            --red: #C40000;
+            --beige: #E8D8B0;
+            --black: #111111;
+            --shadow: 6px 6px 0px var(--black);
+            --shadow-sm: 3px 3px 0px var(--black);
+            --border-thick: 4px solid var(--black);
+            --border-thin: 2px solid var(--black);
+        }
+
+        /* --- GLOBAL & RESET --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--red);
+            color: var(--black);
+            font-family: 'Space Mono', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Grain / Noise Overlay */
+        .noise {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 9999;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.12;
+            mix-blend-mode: multiply;
+        }
+
+        /* --- LAYOUT --- */
+        .app-container {
+            width: 100%;
+            max-width: 900px;
+            padding: 2rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+            background: var(--beige);
+            padding: 1rem 2rem;
+            border: var(--border-thick);
+            box-shadow: var(--shadow);
+            position: relative;
+        }
+
+        /* Corner Screws */
+        header::before, header::after, 
+        .controls-panel::before, .controls-panel::after {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: var(--black);
+            border-radius: 50%;
+        }
+        header::before { top: 10px; left: 10px; }
+        header::after { top: 10px; right: 10px; }
+        .screw-bl { position: absolute; bottom: 10px; left: 10px; width: 12px; height: 12px; background: var(--black); border-radius: 50%; }
+        .screw-br { position: absolute; bottom: 10px; right: 10px; width: 12px; height: 12px; background: var(--black); border-radius: 50%; }
+
+        h1 {
+            font-family: 'Rye', cursive;
+            font-size: clamp(2rem, 5vw, 4rem);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            line-height: 1.1;
+        }
+
+        .subtitle {
+            font-family: 'Space Mono', monospace;
+            font-weight: 700;
+            font-size: 1rem;
+            margin-top: 0.5rem;
+            border-top: var(--border-thin);
+            padding-top: 0.5rem;
+            display: inline-block;
+        }
+
+        /* --- MAIN TIMER AREA --- */
+        .timer-display-wrapper {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 3rem 0;
+            min-height: 350px;
+        }
+
+        /* Progress Ring */
+        .progress-ring-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 380px;
+            height: 380px;
+            z-index: 0;
+        }
+
+        .progress-ring {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .ring-bg {
+            fill: none;
+            stroke: rgba(17, 17, 17, 0.15); /* Translucent black */
+            stroke-width: 12;
+        }
+
+        .ring-fill {
+            fill: none;
+            stroke: var(--beige);
+            stroke-width: 12;
+            stroke-dasharray: 1130; /* 2 * pi * r (r=180) */
+            stroke-dashoffset: 0;
+            transition: stroke-dashoffset 1s linear;
+            stroke-linecap: square;
+        }
+
+        /* View Containers */
+        .view-container {
+            position: relative;
+            z-index: 1;
+            display: none; /* Toggled via JS */
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+        .view-container.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        /* -- FLIP CLOCK MODE -- */
+        .flip-clock {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .flip-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .flip-label {
+            font-family: 'Space Mono', monospace;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            background: var(--black);
+            color: var(--beige);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .flip-card {
+            background: var(--beige);
+            border: var(--border-thick);
+            box-shadow: var(--shadow);
+            border-radius: 8px;
+            width: 100px;
+            height: 140px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 6rem;
+            color: var(--black);
+            position: relative;
+            overflow: hidden;
+            perspective: 1000px;
+        }
+
+        /* The split line */
+        .flip-card::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--black);
+            transform: translateY(-50%);
+            z-index: 5;
+        }
+
+        /* Mechanical Hinges */
+        .flip-card::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: -4px;
+            width: 12px;
+            height: 16px;
+            background: var(--black);
+            transform: translateY(-50%);
+            z-index: 6;
+            border-radius: 0 4px 4px 0;
+        }
+        .flip-hinge-right {
+            position: absolute;
+            top: 50%;
+            right: -4px;
+            width: 12px;
+            height: 16px;
+            background: var(--black);
+            transform: translateY(-50%);
+            z-index: 6;
+            border-radius: 4px 0 0 4px;
+        }
+
+        .digit-val {
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Flip Animation */
+        @keyframes flipDown {
+            0% { transform: rotateX(0deg); opacity: 1; }
+            49% { opacity: 1; }
+            50% { transform: rotateX(-90deg); opacity: 0; }
+            100% { transform: rotateX(0deg); opacity: 1; }
+        }
+        .animating .digit-val {
+            animation: flipDown 0.4s ease-in-out;
+        }
+
+        /* -- ANALOG CLOCK MODE -- */
+        .analog-clock {
+            width: 320px;
+            height: 320px;
+            background: var(--beige);
+            border: 8px solid var(--black);
+            border-radius: 50%;
+            box-shadow: var(--shadow);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .analog-center {
+            width: 20px;
+            height: 20px;
+            background: var(--black);
+            border-radius: 50%;
+            position: absolute;
+            z-index: 10;
+        }
+
+        /* Inner Ring */
+        .analog-inner-ring {
+            position: absolute;
+            width: 90%;
+            height: 90%;
+            border: 2px solid var(--black);
+            border-radius: 50%;
+            opacity: 0.3;
+        }
+
+        /* Numerals */
+        .numeral {
+            position: absolute;
+            font-family: 'Playfair Display', serif;
+            font-weight: 900;
+            font-size: 1.5rem;
+            color: var(--black);
+            text-align: center;
+            width: 30px;
+            height: 30px;
+            /* Numerals positioned via JS */
+        }
+
+        /* Hands */
+        .hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: bottom center;
+            background: var(--black);
+            z-index: 5;
+            border-radius: 4px 4px 0 0;
+            transition: transform 0.2s cubic-bezier(0.4, 2.0, 0.5, 1); /* Bouncy tick */
+        }
+
+        .hand.hour {
+            width: 8px;
+            height: 80px;
+            margin-left: -4px;
+        }
+
+        .hand.minute {
+            width: 6px;
+            height: 110px;
+            margin-left: -3px;
+        }
+
+        .hand.second {
+            width: 2px;
+            height: 130px;
+            margin-left: -1px;
+            background: var(--red);
+            z-index: 6;
+        }
+        
+        /* Second hand tail */
+        .hand.second::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            left: -2px;
+            width: 6px;
+            height: 20px;
+            background: var(--red);
+            border-radius: 2px;
+        }
+
+        /* --- CONTROLS --- */
+        .controls-panel {
+            background: var(--beige);
+            border: var(--border-thick);
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+            width: 100%;
+            position: relative;
+        }
+
+        .top-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        /* Toggles */
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--black);
+            transition: .4s;
+            border: var(--border-thin);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--beige);
+            transition: .4s;
+        }
+
+        input:checked + .slider {
+            background-color: var(--red);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+
+        /* Input Fields */
+        .time-inputs {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            border-top: var(--border-thin);
+            border-bottom: var(--border-thin);
+            padding: 1rem 0;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .input-group label {
+            font-weight: 700;
+        }
+
+        .input-group input {
+            width: 60px;
+            height: 40px;
+            font-family: 'Space Mono', monospace;
+            font-size: 1.2rem;
+            text-align: center;
+            border: var(--border-thick);
+            background: #fff;
+            color: var(--black);
+            outline: none;
+        }
+
+        .input-group input:focus {
+            background: #f0f0f0;
+        }
+
+        /* Buttons */
+        .buttons {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        button {
+            font-family: 'Space Mono', monospace;
+            font-weight: 700;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            padding: 0.8rem 1.5rem;
+            background: #fff;
+            color: var(--black);
+            border: var(--border-thick);
+            box-shadow: var(--shadow-sm);
+            cursor: pointer;
+            transition: all 0.1s ease;
+            position: relative;
+        }
+
+        button:active {
+            transform: translate(3px, 3px);
+            box-shadow: 0px 0px 0px var(--black);
+        }
+
+        button.btn-primary {
+            background: var(--red);
+            color: var(--beige);
+        }
+        button.btn-primary:active {
+            box-shadow: 0px 0px 0px var(--black);
+        }
+
+        /* --- ZERO STATE ANIMATIONS --- */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        @keyframes flash {
+            0%, 50%, 100% { background-color: var(--red); filter: invert(0); }
+            25%, 75% { background-color: var(--beige); filter: invert(1); }
+        }
+
+        body.time-up {
+            animation: flash 1s infinite;
+        }
+        body.time-up .app-container {
+            animation: shake 0.5s infinite;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .flip-clock { gap: 0.5rem; }
+            .flip-card { width: 70px; height: 100px; font-size: 4rem; }
+            .progress-ring-container { width: 300px; height: 300px; }
+            .ring-bg, .ring-fill { stroke-width: 8; }
+            .analog-clock { width: 240px; height: 240px; }
+            .hand.hour { height: 60px; }
+            .hand.minute { height: 80px; }
+            .hand.second { height: 100px; }
+            h1 { font-size: 2rem; }
+            .controls-panel { padding: 1rem; }
+            .time-inputs { flex-direction: column; gap: 0.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="noise"></div>
+
+    <div class="app-container">
+        
+        <header>
+            <div class="screw-bl"></div>
+            <div class="screw-br"></div>
+            <h1>Exodus Hack-Jam</h1>
+            <div class="subtitle">1926 MECHANICAL EDITION</div>
+        </header>
+
+        <div class="timer-display-wrapper">
+            
+            <!-- Progress Ring (Visible in both modes) -->
+            <div class="progress-ring-container">
+                <svg class="progress-ring" viewBox="0 0 380 380">
+                    <circle class="ring-bg" cx="190" cy="190" r="180" />
+                    <circle class="ring-fill" cx="190" cy="190" r="180" id="progress-ring-fill" />
+                </svg>
+            </div>
+
+            <!-- FLIP CLOCK VIEW -->
+            <div class="view-container active" id="view-flip">
+                <div class="flip-clock">
+                    <div class="flip-group">
+                        <div class="flip-card" id="flip-hours">
+                            <div class="flip-hinge-right"></div>
+                            <span class="digit-val">00</span>
+                        </div>
+                        <span class="flip-label">Hours</span>
+                    </div>
+                    
+                    <div class="flip-group">
+                        <div class="flip-card" id="flip-minutes">
+                            <div class="flip-hinge-right"></div>
+                            <span class="digit-val">05</span>
+                        </div>
+                        <span class="flip-label">Minutes</span>
+                    </div>
+
+                    <div class="flip-group">
+                        <div class="flip-card" id="flip-seconds">
+                            <div class="flip-hinge-right"></div>
+                            <span class="digit-val">00</span>
+                        </div>
+                        <span class="flip-label">Seconds</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ANALOG CLOCK VIEW -->
+            <div class="view-container" id="view-analog">
+                <div class="analog-clock">
+                    <div class="analog-inner-ring"></div>
+                    <div class="analog-center"></div>
+                    
+                    <!-- Numerals (Injected via JS) -->
+                    <div id="numerals-container"></div>
+
+                    <!-- Hands -->
+                    <div class="hand hour" id="hand-hour"></div>
+                    <div class="hand minute" id="hand-minute"></div>
+                    <div class="hand second" id="hand-second"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="controls-panel">
+            <div class="screw-bl"></div>
+            <div class="screw-br"></div>
+            
+            <div class="top-controls">
+                <div class="toggle-group">
+                    <span>FLIP</span>
+                    <label class="switch">
+                        <input type="checkbox" id="mode-toggle">
+                        <span class="slider"></span>
+                    </label>
+                    <span>ANALOG</span>
+                </div>
+
+                <div class="toggle-group">
+                    <span>SOUND</span>
+                    <label class="switch">
+                        <input type="checkbox" id="sound-toggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="time-inputs">
+                <div class="input-group">
+                    <label for="in-hr">HR</label>
+                    <input type="number" id="in-hr" min="0" max="99" value="0">
+                </div>
+                <div class="input-group">
+                    <label for="in-min">MIN</label>
+                    <input type="number" id="in-min" min="0" max="59" value="5">
+                </div>
+                <div class="input-group">
+                    <label for="in-sec">SEC</label>
+                    <input type="number" id="in-sec" min="0" max="59" value="0">
+                </div>
+                <button id="btn-set">Set Time</button>
+            </div>
+
+            <div class="buttons">
+                <button class="btn-primary" id="btn-start">Start</button>
+                <button id="btn-pause">Pause</button>
+                <button id="btn-reset">Reset</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- STATE VARIABLES ---
+        let totalSeconds = 5 * 60; // Default 5 minutes
+        let remainingSeconds = totalSeconds;
+        let timerInterval = null;
+        let isRunning = false;
+        let audioCtx = null;
+
+        // --- DOM ELEMENTS ---
+        const flipHoursEl = document.getElementById('flip-hours');
+        const flipMinutesEl = document.getElementById('flip-minutes');
+        const flipSecondsEl = document.getElementById('flip-seconds');
+        
+        const handHourEl = document.getElementById('hand-hour');
+        const handMinuteEl = document.getElementById('hand-minute');
+        const handSecondEl = document.getElementById('hand-second');
+        
+        const progressRingFill = document.getElementById('progress-ring-fill');
+        const ringCircumference = 2 * Math.PI * 180; // r=180
+
+        const viewFlip = document.getElementById('view-flip');
+        const viewAnalog = document.getElementById('view-analog');
+        const modeToggle = document.getElementById('mode-toggle');
+        const soundToggle = document.getElementById('sound-toggle');
+
+        const inHr = document.getElementById('in-hr');
+        const inMin = document.getElementById('in-min');
+        const inSec = document.getElementById('in-sec');
+
+        const btnStart = document.getElementById('btn-start');
+        const btnPause = document.getElementById('btn-pause');
+        const btnReset = document.getElementById('btn-reset');
+        const btnSet = document.getElementById('btn-set');
+
+        // --- INITIALIZATION ---
+        function init() {
+            generateAnalogNumerals();
+            updateDisplay();
+            setupEventListeners();
+        }
+
+        function generateAnalogNumerals() {
+            const container = document.getElementById('numerals-container');
+            const numerals = ['XII', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
+            
+            for (let i = 0; i < 12; i++) {
+                const num = document.createElement('div');
+                num.className = 'numeral';
+                num.innerText = numerals[i];
+                
+                // Position in circle
+                const angle = (i * 30 - 90) * (Math.PI / 180);
+                const radius = 120; // Distance from center
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+                
+                // Center the numeral based on its own size (30x30)
+                num.style.left = `calc(50% + ${x}px - 15px)`;
+                num.style.top = `calc(50% + ${y}px - 15px)`;
+                
+                container.appendChild(num);
+            }
+        }
+
+        function setupEventListeners() {
+            btnStart.addEventListener('click', startTimer);
+            btnPause.addEventListener('click', pauseTimer);
+            btnReset.addEventListener('click', resetTimer);
+            btnSet.addEventListener('click', setTimeFromInputs);
+            
+            modeToggle.addEventListener('change', (e) => {
+                if(e.target.checked) {
+                    viewFlip.classList.remove('active');
+                    viewAnalog.classList.add('active');
+                } else {
+                    viewAnalog.classList.remove('active');
+                    viewFlip.classList.add('active');
+                }
+            });
+        }
+
+        // --- AUDIO ENGINE ---
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playTickSound() {
+            if (!soundToggle.checked) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.05);
+                
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.05);
+            } catch(e) {}
+        }
+
+        function playAlarmSound() {
+            if (!soundToggle.checked) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.type = 'square';
+                // Siren effect
+                osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(600, audioCtx.currentTime + 0.2);
+                osc.frequency.linearRampToValueAtTime(400, audioCtx.currentTime + 0.4);
+                osc.frequency.linearRampToValueAtTime(600, audioCtx.currentTime + 0.6);
+                
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1.5);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 1.5);
+            } catch(e) {}
+        }
+
+        // --- TIMER LOGIC ---
+        function setTimeFromInputs() {
+            const h = parseInt(inHr.value) || 0;
+            const m = parseInt(inMin.value) || 0;
+            const s = parseInt(inSec.value) || 0;
+            
+            totalSeconds = (h * 3600) + (m * 60) + s;
+            if(totalSeconds <= 0) totalSeconds = 1; // Prevent 0 init
+            remainingSeconds = totalSeconds;
+            
+            resetTimerUI();
+            updateDisplay();
+        }
+
+        function startTimer() {
+            if (isRunning) return;
+            initAudio(); // Required due to browser auto-play policies
+            
+            if (remainingSeconds <= 0) {
+                resetTimerUI();
+                remainingSeconds = totalSeconds;
+            }
+            
+            isRunning = true;
+            timerInterval = setInterval(() => {
+                remainingSeconds--;
+                updateDisplay();
+                
+                if (remainingSeconds > 0) {
+                    playTickSound();
+                } else {
+                    timerComplete();
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            isRunning = false;
+            clearInterval(timerInterval);
+        }
+
+        function resetTimer() {
+            pauseTimer();
+            remainingSeconds = totalSeconds;
+            resetTimerUI();
+            updateDisplay();
+        }
+
+        function resetTimerUI() {
+            document.body.classList.remove('time-up');
+        }
+
+        function timerComplete() {
+            pauseTimer();
+            document.body.classList.add('time-up');
+            playAlarmSound();
+        }
+
+        // --- DISPLAY UPDATES ---
+        function updateDisplay() {
+            const h = Math.floor(remainingSeconds / 3600);
+            const m = Math.floor((remainingSeconds % 3600) / 60);
+            const s = remainingSeconds % 60;
+
+            updateFlip(flipHoursEl, formatTime(h));
+            updateFlip(flipMinutesEl, formatTime(m));
+            updateFlip(flipSecondsEl, formatTime(s));
+
+            updateAnalog(h, m, s);
+            updateProgressRing();
+        }
+
+        function formatTime(num) {
+            return num < 10 ? `0${num}` : num.toString();
+        }
+
+        function updateFlip(element, newValue) {
+            const digitVal = element.querySelector('.digit-val');
+            if (digitVal.innerText !== newValue) {
+                element.classList.remove('animating');
+                void element.offsetWidth; // Trigger reflow
+                element.classList.add('animating');
+                
+                // Update value halfway through animation
+                setTimeout(() => {
+                    digitVal.innerText = newValue;
+                }, 200); 
+            }
+        }
+
+        function updateAnalog(h, m, s) {
+            // Standard clock rotation calculation mapping remaining time to dial
+            const sDeg = s * 6;
+            const mDeg = (m * 6) + (s * 0.1);
+            const hDeg = (h % 12) * 30 + (m * 0.5);
+
+            handSecondEl.style.transform = `rotate(${sDeg}deg)`;
+            handMinuteEl.style.transform = `rotate(${mDeg}deg)`;
+            handHourEl.style.transform = `rotate(${hDeg}deg)`;
+        }
+
+        function updateProgressRing() {
+            if (totalSeconds === 0) return;
+            const percent = remainingSeconds / totalSeconds;
+            const offset = ringCircumference - (percent * ringCircumference);
+            progressRingFill.style.strokeDashoffset = offset;
+        }
+
+        // Boot
+        init();
+
+    </script>
+</body>
+</html>

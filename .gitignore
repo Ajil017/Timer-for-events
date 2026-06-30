@@ -1,0 +1,6 @@
+# Exclude college-os development directory from this repository
+college-os/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
