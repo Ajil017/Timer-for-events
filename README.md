@@ -58,7 +58,10 @@ When the timer hits zero:
 ---
 
 ## 📂 Project Structure
-
+![Project Preview](./images/timer1.png)
+![Project Preview](./images/timer2.png)
+![Project Preview](./images/timer3.png)
+![Project Preview](./images/timer4.png)
 
 ## 🛠️ Tech Stack & Architecture
 
