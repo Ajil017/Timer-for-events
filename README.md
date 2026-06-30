@@ -57,6 +57,9 @@ When the timer hits zero:
 
 ---
 
+## 📂 Project Structure
+
+
 ## 🛠️ Tech Stack & Architecture
 
 This application is built with **zero external dependencies**, ensuring maximum performance, security, and instantaneous load times:
